@@ -1,585 +1,991 @@
-// server.js - Main Express server
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-const multer = require('multer');
-const { Server } = require('socket.io');
-const http = require('http');
-const redis = require('redis');
-
+const axios = require('axios');
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:3001",
-    methods: ["GET", "POST"]
-  }
-});
-
-// Redis client for caching
-const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379
-});
 
 // Middleware
-app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use('/api/', limiter);
+// Configuration
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+const PORT = process.env.PORT || 5000;
 
-// File upload configuration
-const upload = multer({
-  dest: 'uploads/',
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
-  }
-});
+// ============================================================================
+// PROGRAMMING LANGUAGE DETECTION
+// ============================================================================
 
-// MongoDB Models
-const UserSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { type: String, enum: ['developer', 'admin'], default: 'developer' },
-  createdAt: { type: Date, default: Date.now }
-});
+class ProgrammingLanguageDetector {
+    constructor() {
+        // Common file extensions mapping
+        this.extensionMap = {
+            '.js': 'javascript',
+            '.jsx': 'javascript',
+            '.ts': 'typescript',
+            '.tsx': 'typescript',
+            '.py': 'python',
+            '.java': 'java',
+            '.c': 'c',
+            '.cpp': 'cpp',
+            '.cxx': 'cpp',
+            '.cc': 'cpp',
+            '.h': 'c',
+            '.hpp': 'cpp',
+            '.cs': 'csharp',
+            '.php': 'php',
+            '.rb': 'ruby',
+            '.go': 'go',
+            '.rs': 'rust',
+            '.kt': 'kotlin',
+            '.swift': 'swift',
+            '.r': 'r',
+            '.sql': 'sql',
+            '.html': 'html',
+            '.css': 'css',
+            '.scss': 'scss',
+            '.sass': 'sass',
+            '.xml': 'xml',
+            '.json': 'json',
+            '.yaml': 'yaml',
+            '.yml': 'yaml'
+        };
 
-const ProjectSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  description: String,
-  language: { type: String, required: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  files: [{
-    name: String,
-    content: String,
-    path: String
-  }],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-const AnalysisSchema = new mongoose.Schema({
-  projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  code: { type: String, required: true },
-  language: { type: String, required: true },
-  vulnerabilities: [{
-    type: String,
-    severity: { type: String, enum: ['Low', 'Medium', 'High', 'Critical'] },
-    line: Number,
-    description: String,
-    suggestion: String,
-    cweId: String
-  }],
-  performanceIssues: [{
-    type: String,
-    severity: { type: String, enum: ['Low', 'Medium', 'High'] },
-    line: Number,
-    description: String,
-    suggestion: String,
-    estimatedImprovement: String
-  }],
-  bestPractices: [{
-    type: String,
-    severity: { type: String, enum: ['Low', 'Medium', 'High'] },
-    line: Number,
-    description: String,
-    suggestion: String
-  }],
-  score: { type: Number, min: 0, max: 100 },
-  analysisTime: String,
-  createdAt: { type: Date, default: Date.now }
-});
-
-const User = mongoose.model('User', UserSchema);
-const Project = mongoose.model('Project', ProjectSchema);
-const Analysis = mongoose.model('Analysis', AnalysisSchema);
-
-// Authentication middleware
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid token' });
+        // Language-specific keywords and patterns
+        this.languageSignatures = {
+            javascript: {
+                keywords: ['function', 'var', 'let', 'const', 'typeof', 'undefined', 'null', 'true', 'false'],
+                patterns: [
+                    /function\s+\w+\s*\(/,
+                    /const\s+\w+\s*=/,
+                    /let\s+\w+\s*=/,
+                    /var\s+\w+\s*=/,
+                    /=>\s*{/,
+                    /console\.log/,
+                    /document\./,
+                    /window\./
+                ],
+                unique: ['===', '!==', 'typeof', 'undefined']
+            },
+            python: {
+                keywords: ['def', 'class', 'import', 'from', 'if', 'elif', 'else', 'for', 'while', 'try', 'except'],
+                patterns: [
+                    /def\s+\w+\s*\(/,
+                    /class\s+\w+\s*:/,
+                    /import\s+\w+/,
+                    /from\s+\w+\s+import/,
+                    /if\s+__name__\s*==\s*['"']__main__['"']/,
+                    /print\s*\(/
+                ],
+                unique: ['elif', 'def ', '__init__', '__name__', 'import ']
+            },
+            java: {
+                keywords: ['public', 'private', 'protected', 'class', 'interface', 'extends', 'implements'],
+                patterns: [
+                    /public\s+class\s+\w+/,
+                    /public\s+static\s+void\s+main/,
+                    /System\.out\.println/,
+                    /\w+\s+\w+\s*=\s*new\s+\w+\s*\(/,
+                    /@\w+/
+                ],
+                unique: ['System.out.', 'public static void main', 'extends ', 'implements ']
+            },
+            c: {
+                keywords: ['#include', 'int', 'char', 'float', 'double', 'void', 'struct', 'typedef'],
+                patterns: [
+                    /#include\s*<[^>]+>/,
+                    /int\s+main\s*\(/,
+                    /printf\s*\(/,
+                    /scanf\s*\(/,
+                    /\w+\s*\*\s*\w+/
+                ],
+                unique: ['#include', 'printf(', 'scanf(', 'int main(']
+            },
+            cpp: {
+                keywords: ['#include', 'namespace', 'using', 'class', 'public:', 'private:', 'protected:'],
+                patterns: [
+                    /#include\s*<iostream>/,
+                    /using\s+namespace\s+std/,
+                    /std::/,
+                    /cout\s*<</, 
+                    /cin\s*>>/,
+                    /class\s+\w+\s*{/
+                ],
+                unique: ['std::', 'cout <<', 'cin >>', 'using namespace', '#include <iostream>']
+            },
+            csharp: {
+                keywords: ['using', 'namespace', 'class', 'public', 'private', 'static', 'void'],
+                patterns: [
+                    /using\s+System/,
+                    /namespace\s+\w+/,
+                    /Console\.WriteLine/,
+                    /public\s+static\s+void\s+Main/,
+                    /\[.*\]/
+                ],
+                unique: ['Console.WriteLine', 'using System', 'namespace ']
+            },
+            php: {
+                keywords: ['<?php', 'function', 'class', 'public', 'private', 'protected'],
+                patterns: [
+                    /<\?php/,
+                    /\$\w+/,
+                    /echo\s+/,
+                    /function\s+\w+\s*\(/,
+                    /->\w+/
+                ],
+                unique: ['<?php', 
+            , 'echo ', '->']
+            },
+            go: {
+                keywords: ['package', 'import', 'func', 'var', 'const', 'type', 'struct'],
+                patterns: [
+                    /package\s+main/,
+                    /import\s*\(/,
+                    /func\s+\w+\s*\(/,
+                    /fmt\.Print/,
+                    /:=/
+                ],
+                unique: ['package ', 'func ', 'fmt.', ':=']
+            },
+            rust: {
+                keywords: ['fn', 'let', 'mut', 'struct', 'enum', 'impl', 'trait'],
+                patterns: [
+                    /fn\s+\w+\s*\(/,
+                    /let\s+mut\s+/,
+                    /println!\s*\(/,
+                    /::\w+/,
+                    /&\w+/
+                ],
+                unique: ['fn ', 'let mut', 'println!', '::']
+            },
+            ruby: {
+                keywords: ['def', 'class', 'module', 'end', 'if', 'else', 'elsif'],
+                patterns: [
+                    /def\s+\w+/,
+                    /class\s+\w+/,
+                    /puts\s+/,
+                    /@\w+/,
+                    /\w+\.each\s+do/
+                ],
+                unique: ['def ', 'puts ', 'end', 'elsif']
+            },
+            sql: {
+                keywords: ['SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER'],
+                patterns: [
+                    /SELECT\s+.*\s+FROM/i,
+                    /INSERT\s+INTO/i,
+                    /UPDATE\s+.*\s+SET/i,
+                    /DELETE\s+FROM/i,
+                    /CREATE\s+TABLE/i
+                ],
+                unique: ['SELECT ', 'FROM ', 'WHERE ', 'INSERT INTO']
+            }
+        };
     }
-    req.user = user;
-    next();
-  });
-};
 
-// ML Analysis Service
-class MLAnalysisService {
-  static async analyzeCode(code, language) {
-    const startTime = Date.now();
-    
-    // Simulate ML analysis - in production, this would call Python microservices
-    const vulnerabilities = await this.detectVulnerabilities(code, language);
-    const performanceIssues = await this.analyzePerformance(code, language);
-    const bestPractices = await this.checkBestPractices(code, language);
-    
-    const analysisTime = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
-    const score = this.calculateScore(vulnerabilities, performanceIssues, bestPractices);
-    
-    return {
-      vulnerabilities,
-      performanceIssues,
-      bestPractices,
-      score,
-      analysisTime
-    };
-  }
-
-  static async detectVulnerabilities(code, language) {
-    // Simulated vulnerability detection patterns
-    const vulnerabilities = [];
-    
-    // SQL Injection detection
-    if (code.includes("SELECT") && code.includes("+ ")) {
-      vulnerabilities.push({
-        type: 'SQL Injection',
-        severity: 'High',
-        line: this.findLineNumber(code, "SELECT"),
-        description: 'Direct string concatenation in SQL query allows injection attacks',
-        suggestion: 'Use parameterized queries or prepared statements',
-        cweId: 'CWE-89'
-      });
-    }
-    
-    // XSS detection
-    if (code.includes("innerHTML") && code.includes("+ ")) {
-      vulnerabilities.push({
-        type: 'Cross-Site Scripting (XSS)',
-        severity: 'Medium',
-        line: this.findLineNumber(code, "innerHTML"),
-        description: 'Unsanitized user input directly inserted into DOM',
-        suggestion: 'Use textContent instead of innerHTML or sanitize input',
-        cweId: 'CWE-79'
-      });
-    }
-    
-    // Buffer overflow (for C/C++)
-    if (language === 'c' || language === 'cpp') {
-      if (code.includes("strcpy") || code.includes("strcat")) {
-        vulnerabilities.push({
-          type: 'Buffer Overflow',
-          severity: 'Critical',
-          line: this.findLineNumber(code, "strcpy"),
-          description: 'Unsafe string functions can cause buffer overflow',
-          suggestion: 'Use safer alternatives like strncpy or string classes',
-          cweId: 'CWE-120'
-        });
-      }
-    }
-    
-    return vulnerabilities;
-  }
-
-  static async analyzePerformance(code, language) {
-    const issues = [];
-    
-    // Nested loop detection
-    const nestedLoopPattern = /for\s*\([^}]*\{[^}]*for\s*\(/g;
-    if (nestedLoopPattern.test(code)) {
-      issues.push({
-        type: 'Algorithmic Complexity',
-        severity: 'High',
-        line: this.findLineNumber(code, "for"),
-        description: 'Nested loop creates O(n²) complexity',
-        suggestion: 'Optimize algorithm or use more efficient data structures',
-        estimatedImprovement: '95% faster execution'
-      });
-    }
-    
-    // Large array creation in loop
-    if (code.includes("push") && code.includes("for")) {
-      issues.push({
-        type: 'Memory Inefficiency',
-        severity: 'Medium',
-        line: this.findLineNumber(code, "push"),
-        description: 'Array growth in tight loop causes memory fragmentation',
-        suggestion: 'Pre-allocate array size or use different data structure',
-        estimatedImprovement: '60% memory reduction'
-      });
-    }
-    
-    return issues;
-  }
-
-  static async checkBestPractices(code, language) {
-    const issues = [];
-    
-    // Function naming
-    if (code.includes("function ")) {
-      const functionPattern = /function\s+([a-z][a-zA-Z]*)/g;
-      let match;
-      while ((match = functionPattern.exec(code)) !== null) {
-        if (match[1].length < 5) {
-          issues.push({
-            type: 'Function Naming',
-            severity: 'Low',
-            line: this.findLineNumber(code, match[0]),
-            description: 'Function name could be more descriptive',
-            suggestion: 'Use descriptive names that explain the function\'s purpose'
-          });
+    detectLanguage(code, filename = '') {
+        // First, try to detect by file extension
+        if (filename) {
+            const ext = this.getFileExtension(filename);
+            if (this.extensionMap[ext]) {
+                return {
+                    language: this.extensionMap[ext],
+                    confidence: 0.9,
+                    method: 'file_extension'
+                };
+            }
         }
-      }
-    }
-    
-    // Missing error handling
-    if (!code.includes("try") && !code.includes("catch")) {
-      issues.push({
-        type: 'Error Handling',
-        severity: 'Medium',
-        line: 1,
-        description: 'No error handling detected in code',
-        suggestion: 'Add try-catch blocks for proper error handling'
-      });
-    }
-    
-    return issues;
-  }
 
-  static findLineNumber(code, searchString) {
-    const lines = code.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes(searchString)) {
-        return i + 1;
-      }
+        // If no filename or unknown extension, analyze code content
+        return this.detectByContent(code);
     }
-    return 1;
-  }
 
-  static calculateScore(vulnerabilities, performanceIssues, bestPractices) {
-    let score = 100;
-    
-    vulnerabilities.forEach(vuln => {
-      switch (vuln.severity) {
-        case 'Critical': score -= 25; break;
-        case 'High': score -= 15; break;
-        case 'Medium': score -= 10; break;
-        case 'Low': score -= 5; break;
-      }
-    });
-    
-    performanceIssues.forEach(issue => {
-      switch (issue.severity) {
-        case 'High': score -= 10; break;
-        case 'Medium': score -= 5; break;
-        case 'Low': score -= 2; break;
-      }
-    });
-    
-    bestPractices.forEach(practice => {
-      switch (practice.severity) {
-        case 'High': score -= 5; break;
-        case 'Medium': score -= 3; break;
-        case 'Low': score -= 1; break;
-      }
-    });
-    
-    return Math.max(0, score);
-  }
+    detectByContent(code) {
+        const scores = {};
+        const codeNormalized = code.toLowerCase();
+
+        // Score each language based on patterns and keywords
+        for (const [language, signature] of Object.entries(this.languageSignatures)) {
+            let score = 0;
+
+            // Check unique identifiers (high weight)
+            signature.unique.forEach(unique => {
+                if (codeNormalized.includes(unique.toLowerCase())) {
+                    score += 10;
+                }
+            });
+
+            // Check patterns (medium weight)
+            signature.patterns.forEach(pattern => {
+                if (pattern.test(code)) {
+                    score += 5;
+                }
+            });
+
+            // Check keywords (low weight)
+            signature.keywords.forEach(keyword => {
+                const regex = new RegExp(`\\b${keyword.toLowerCase()}\\b`, 'g');
+                const matches = codeNormalized.match(regex);
+                if (matches) {
+                    score += matches.length * 1;
+                }
+            });
+
+            scores[language] = score;
+        }
+
+        // Find the language with highest score
+        const detectedLanguage = Object.entries(scores)
+            .filter(([, score]) => score > 0)
+            .sort(([, a], [, b]) => b - a)[0];
+
+        if (!detectedLanguage) {
+            return {
+                language: 'text',
+                confidence: 0.1,
+                method: 'fallback'
+            };
+        }
+
+        const [language, score] = detectedLanguage;
+        const maxPossibleScore = this.languageSignatures[language].unique.length * 10 + 
+                                this.languageSignatures[language].patterns.length * 5;
+        const confidence = Math.min(score / maxPossibleScore, 1.0);
+
+        return {
+            language,
+            confidence: Math.round(confidence * 100) / 100,
+            method: 'content_analysis',
+            allScores: scores
+        };
+    }
+
+    getFileExtension(filename) {
+        const lastDotIndex = filename.lastIndexOf('.');
+        return lastDotIndex !== -1 ? filename.substring(lastDotIndex) : '';
+    }
+
+    getSupportedLanguages() {
+        return [...new Set(Object.values(this.extensionMap))];
+    }
 }
 
-// Routes
+// ============================================================================
+// ML SERVICE INTEGRATION
+// ============================================================================
 
-// Authentication Routes
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-    
-    // Check if user exists
-    const existingUser = await User.findOne({ 
-      $or: [{ email }, { username }] 
-    });
-    
-    if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
+class MLServiceClient {
+    constructor(baseURL) {
+        this.baseURL = baseURL;
     }
-    
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // Create user
-    const user = new User({
-      username,
-      email,
-      password: hashedPassword
-    });
-    
-    await user.save();
-    
-    // Generate JWT
-    const token = jwt.sign(
-      { userId: user._id, username: user.username },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
-    
-    res.status(201).json({
-      message: 'User created successfully',
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    async checkHealth() {
+        try {
+            const response = await axios.get(`${this.baseURL}/health`);
+            return response.data;
+        } catch (error) {
+            console.error('ML service health check failed:', error.message);
+            return { status: 'unavailable', error: error.message };
+        }
     }
-    
-    // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+
+    async analyzeCode(code, language) {
+        try {
+            const response = await axios.post(`${this.baseURL}/analyze/complete`, {
+                code,
+                language
+            });
+            return {
+                ...response.data,
+                mlPowered: true,
+                source: 'ml_service'
+            };
+        } catch (error) {
+            console.error('ML analysis failed:', error.message);
+            throw new Error(`ML analysis failed: ${error.message}`);
+        }
     }
-    
-    // Generate JWT
-    const token = jwt.sign(
-      { userId: user._id, username: user.username },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
-    
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
-// Analysis Routes
-app.post('/api/analysis/analyze', authenticateToken, async (req, res) => {
-  try {
-    const { code, language, projectId } = req.body;
-    
-    if (!code || !language) {
-      return res.status(400).json({ error: 'Code and language are required' });
+    async testMLModels() {
+        try {
+            const response = await axios.post(`${this.baseURL}/test-ml`, {});
+            return response.data;
+        } catch (error) {
+            console.error('ML model test failed:', error.message);
+            return { status: 'failed', error: error.message };
+        }
     }
-    
-    // Check cache first
-    const cacheKey = `analysis:${Buffer.from(code).toString('base64')}:${language}`;
-    const cachedResult = await redisClient.get(cacheKey);
-    
-    if (cachedResult) {
-      return res.json({
-        ...JSON.parse(cachedResult),
-        cached: true
-      });
+}
+
+// Initialize services with error handling
+let languageDetector;
+let mlService;
+
+try {
+    languageDetector = new ProgrammingLanguageDetector();
+    mlService = new MLServiceClient(ML_SERVICE_URL);
+    console.log('✅ Services initialized successfully');
+} catch (error) {
+    console.error('❌ Failed to initialize services:', error);
+    process.exit(1);
+}
+
+// ============================================================================
+// VALIDATION MIDDLEWARE
+// ============================================================================
+
+const validateCodeInput = (req, res, next) => {
+    try {
+        const { code } = req.body;
+        
+        if (!code) {
+            return res.status(400).json({ 
+                error: 'Code is required',
+                details: 'Request body must include a "code" field with the source code to analyze'
+            });
+        }
+        
+        if (typeof code !== 'string') {
+            return res.status(400).json({ 
+                error: 'Code must be a string',
+                details: `Received type: ${typeof code}`
+            });
+        }
+        
+        if (code.trim() === '') {
+            return res.status(400).json({ 
+                error: 'Code cannot be empty',
+                details: 'Provide actual source code content for analysis'
+            });
+        }
+        
+        if (code.length > 1000000) { // 1MB limit
+            return res.status(413).json({ 
+                error: 'Code too large',
+                details: 'Maximum code size is 1MB (1,000,000 characters)',
+                currentSize: code.length
+            });
+        }
+        
+        next();
+    } catch (error) {
+        console.error('Validation error:', error);
+        res.status(500).json({ 
+            error: 'Validation failed',
+            message: error.message 
+        });
     }
-    
-    // Perform ML analysis
-    const analysisResult = await MLAnalysisService.analyzeCode(code, language);
-    
-    // Save analysis to database
-    const analysis = new Analysis({
-      projectId: projectId || null,
-      userId: req.user.userId,
-      code,
-      language,
-      ...analysisResult
-    });
-    
-    await analysis.save();
-    
-    // Cache result for 1 hour
-    await redisClient.setex(cacheKey, 3600, JSON.stringify(analysisResult));
-    
-    // Emit real-time update if WebSocket connected
-    io.to(`user:${req.user.userId}`).emit('analysisComplete', {
-      analysisId: analysis._id,
-      result: analysisResult
-    });
-    
-    res.json(analysisResult);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+};
 
-app.get('/api/analysis/history', authenticateToken, async (req, res) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
-    
-    const analyses = await Analysis.find({ userId: req.user.userId })
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .populate('projectId', 'name');
-    
-    const total = await Analysis.countDocuments({ userId: req.user.userId });
-    
-    res.json({
-      analyses,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      total
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Project Routes
-app.post('/api/projects', authenticateToken, async (req, res) => {
-  try {
-    const { name, description, language } = req.body;
-    
-    const project = new Project({
-      name,
-      description,
-      language,
-      userId: req.user.userId
-    });
-    
-    await project.save();
-    res.status(201).json(project);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/projects', authenticateToken, async (req, res) => {
-  try {
-    const projects = await Project.find({ userId: req.user.userId })
-      .sort({ updatedAt: -1 });
-    
-    res.json(projects);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.put('/api/projects/:id', authenticateToken, async (req, res) => {
-  try {
-    const project = await Project.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.userId },
-      { ...req.body, updatedAt: Date.now() },
-      { new: true }
-    );
-    
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found' });
+const validateLanguageInput = (req, res, next) => {
+    try {
+        const { language } = req.body;
+        
+        if (language && typeof language !== 'string') {
+            return res.status(400).json({ 
+                error: 'Language must be a string',
+                details: `Received type: ${typeof language}`
+            });
+        }
+        
+        if (language && !languageDetector.validateLanguage(language)) {
+            return res.status(400).json({ 
+                error: 'Unsupported language',
+                details: `Language "${language}" is not supported`,
+                supportedLanguages: languageDetector.getSupportedLanguages()
+            });
+        }
+        
+        next();
+    } catch (error) {
+        console.error('Language validation error:', error);
+        res.status(500).json({ 
+            error: 'Language validation failed',
+            message: error.message 
+        });
     }
-    
-    res.json(project);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+};
 
-// File Upload Route
-app.post('/api/upload', authenticateToken, upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+// ============================================================================
+// API ROUTES
+// ============================================================================
+
+// Health check with comprehensive system status
+app.get('/api/health', async (req, res) => {
+    try {
+        const startTime = Date.now();
+        
+        // Check ML service health
+        const mlHealth = await mlService.checkHealth();
+        
+        // System information
+        const systemInfo = {
+            nodeVersion: process.version,
+            platform: process.platform,
+            arch: process.arch,
+            uptime: process.uptime(),
+            memoryUsage: process.memoryUsage(),
+            timestamp: new Date().toISOString()
+        };
+        
+        const responseTime = Date.now() - startTime;
+        
+        res.json({
+            status: 'healthy',
+            server: {
+                port: PORT,
+                environment: process.env.NODE_ENV || 'development',
+                responseTime: `${responseTime}ms`
+            },
+            services: {
+                languageDetection: 'available',
+                mlService: mlHealth.status,
+                mlServiceDetails: mlHealth
+            },
+            supportedLanguages: languageDetector.getSupportedLanguages(),
+            features: {
+                languageDetection: true,
+                codeAnalysis: mlHealth.status === 'healthy',
+                batchProcessing: true,
+                fileUpload: false // Not implemented in this version
+            },
+            system: systemInfo
+        });
+    } catch (error) {
+        console.error('Health check error:', error);
+        res.status(500).json({
+            status: 'unhealthy',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
     }
+});
+
+// Language detection endpoint with robust error handling
+app.post('/api/detect-language', validateCodeInput, (req, res) => {
+    try {
+        const { code, filename } = req.body;
+        const startTime = Date.now();
+        
+        // Validate filename if provided
+        if (filename && typeof filename !== 'string') {
+            return res.status(400).json({ 
+                error: 'Filename must be a string',
+                details: `Received type: ${typeof filename}`
+            });
+        }
+        
+        const detection = languageDetector.detectLanguage(code, filename);
+        const responseTime = Date.now() - startTime;
+        
+        // Check if there was an error in detection
+        if (detection.error) {
+            return res.status(400).json({
+                ...detection,
+                responseTime: `${responseTime}ms`,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        res.json({
+            ...detection,
+            supportedForAnalysis: ['javascript', 'python', 'java'].includes(detection.language),
+            responseTime: `${responseTime}ms`,
+            timestamp: new Date().toISOString(),
+            inputStats: {
+                codeLength: code.length,
+                linesOfCode: code.split('\n').length,
+                hasFilename: !!filename
+            }
+        });
+    } catch (error) {
+        console.error('Language detection endpoint error:', error);
+        res.status(500).json({ 
+            error: 'Language detection failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Enhanced code analysis with comprehensive error handling
+app.post('/api/analyze-code', validateCodeInput, validateLanguageInput, async (req, res) => {
+    const startTime = Date.now();
+    let analysisAttempted = false;
     
-    const fs = require('fs');
-    const fileContent = fs.readFileSync(req.file.path, 'utf8');
-    
-    // Detect language from file extension
-    const extension = req.file.originalname.split('.').pop().toLowerCase();
-    const languageMap = {
-      'js': 'javascript',
-      'py': 'python',
-      'java': 'java',
-      'cpp': 'cpp',
-      'c': 'c',
-      'ts': 'typescript'
-    };
-    
-    const language = languageMap[extension] || 'text';
-    
-    // Clean up uploaded file
-    fs.unlinkSync(req.file.path);
-    
-    res.json({
-      content: fileContent,
-      language,
-      filename: req.file.originalname
+    try {
+        const { code, language: providedLanguage, filename, autoDetect = true } = req.body;
+        
+        let detectedLanguage = providedLanguage;
+        let languageDetection = null;
+        
+        // Auto-detect language if not provided or if autoDetect is true
+        if (!providedLanguage || autoDetect) {
+            try {
+                languageDetection = languageDetector.detectLanguage(code, filename);
+                
+                if (languageDetection.error) {
+                    return res.status(400).json({
+                        error: 'Language detection failed',
+                        details: languageDetection.error,
+                        languageDetection,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                
+                detectedLanguage = languageDetection.language;
+            } catch (detectionError) {
+                console.error('Language auto-detection failed:', detectionError);
+                return res.status(500).json({
+                    error: 'Language auto-detection failed',
+                    message: detectionError.message,
+                    fallback: 'Please specify language manually'
+                });
+            }
+        }
+        
+        // Validate detected language
+        if (!detectedLanguage) {
+            return res.status(400).json({
+                error: 'Unable to determine programming language',
+                details: 'Please specify the language manually or provide a filename with extension',
+                supportedLanguages: languageDetector.getSupportedLanguages()
+            });
+        }
+        
+        // Check if language is supported for ML analysis
+        const supportedLanguages = ['javascript', 'python', 'java'];
+        if (!supportedLanguages.includes(detectedLanguage.toLowerCase())) {
+            return res.status(422).json({
+                error: `Language '${detectedLanguage}' is not yet supported for analysis`,
+                detectedLanguage,
+                languageDetection,
+                supportedLanguages,
+                message: 'Please try with JavaScript, Python, or Java code',
+                responseTime: `${Date.now() - startTime}ms`
+            });
+        }
+        
+        // Perform ML analysis
+        analysisAttempted = true;
+        const analysisResult = await mlService.analyzeCode(code, detectedLanguage);
+        const responseTime = Date.now() - startTime;
+        
+        res.json({
+            success: true,
+            detectedLanguage,
+            languageDetection,
+            analysis: {
+                ...analysisResult,
+                codeLength: code.length,
+                linesOfCode: code.split('\n').length,
+                processingTime: `${responseTime}ms`
+            },
+            metadata: {
+                analysisAttempted: true,
+                mlServiceUsed: true,
+                timestamp: new Date().toISOString(),
+                version: '1.0'
+            }
+        });
+        
+    } catch (error) {
+        const responseTime = Date.now() - startTime;
+        console.error('Code analysis error:', error);
+        
+        // Provide different error responses based on the type of error
+        if (error.message.includes('ML analysis failed')) {
+            res.status(503).json({ 
+                error: 'ML analysis service unavailable',
+                message: error.message,
+                fallback: 'ML service is currently unavailable. Please try again later.',
+                analysisAttempted,
+                responseTime: `${responseTime}ms`,
+                timestamp: new Date().toISOString()
+            });
+        } else if (error.message.includes('timeout')) {
+            res.status(504).json({
+                error: 'Analysis timeout',
+                message: 'Code analysis took too long to complete',
+                suggestion: 'Try with smaller code samples or contact support',
+                responseTime: `${responseTime}ms`,
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            res.status(500).json({ 
+                error: 'Code analysis failed',
+                message: error.message,
+                analysisAttempted,
+                responseTime: `${responseTime}ms`,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+});
+
+// Test ML service connectivity with detailed diagnostics
+app.get('/api/test-ml', async (req, res) => {
+    try {
+        const startTime = Date.now();
+        
+        // Test basic connectivity
+        const healthCheck = await mlService.checkHealth();
+        
+        // Test ML models if service is healthy
+        let modelTest = null;
+        if (healthCheck.status === 'healthy' || healthCheck.statusCode === 200) {
+            try {
+                modelTest = await mlService.testMLModels();
+            } catch (modelError) {
+                console.warn('ML model test failed:', modelError.message);
+                modelTest = {
+                    status: 'failed',
+                    error: modelError.message
+                };
+            }
+        }
+        
+        const responseTime = Date.now() - startTime;
+        
+        res.json({
+            healthCheck,
+            modelTest,
+            diagnostics: {
+                mlServiceUrl: ML_SERVICE_URL,
+                responseTime: `${responseTime}ms`,
+                timestamp: new Date().toISOString(),
+                recommendedAction: healthCheck.status === 'healthy' 
+                    ? 'ML service is ready for code analysis'
+                    : 'Start the ML service on port 8000 and ensure it\'s accessible'
+            }
+        });
+        
+    } catch (error) {
+        console.error('ML test error:', error);
+        res.status(500).json({ 
+            error: 'ML service test failed',
+            message: error.message,
+            diagnostics: {
+                mlServiceUrl: ML_SERVICE_URL,
+                timestamp: new Date().toISOString(),
+                troubleshooting: [
+                    'Ensure ML service is running on port 8000',
+                    'Check network connectivity',
+                    'Verify ML service dependencies are installed',
+                    'Check ML service logs for errors'
+                ]
+            }
+        });
+    }
+});
+
+// Batch language detection with comprehensive error handling
+app.post('/api/detect-languages-batch', (req, res) => {
+    try {
+        const { files } = req.body;
+        const startTime = Date.now();
+        
+        // Validate input
+        if (!files) {
+            return res.status(400).json({ 
+                error: 'Files array is required',
+                details: 'Request body must include a "files" array'
+            });
+        }
+        
+        if (!Array.isArray(files)) {
+            return res.status(400).json({ 
+                error: 'Files must be an array',
+                details: `Received type: ${typeof files}`
+            });
+        }
+        
+        if (files.length === 0) {
+            return res.status(400).json({ 
+                error: 'Files array cannot be empty',
+                details: 'Provide at least one file for batch processing'
+            });
+        }
+        
+        if (files.length > 100) { // Limit batch size
+            return res.status(413).json({ 
+                error: 'Too many files',
+                details: 'Maximum batch size is 100 files',
+                currentSize: files.length
+            });
+        }
+        
+        const results = [];
+        const errors = [];
+        
+        files.forEach((file, index) => {
+            try {
+                // Validate individual file structure
+                if (!file || typeof file !== 'object') {
+                    errors.push({
+                        index,
+                        error: 'Invalid file object',
+                        details: 'Each file must be an object with code and filename properties'
+                    });
+                    return;
+                }
+                
+                if (!file.code) {
+                    errors.push({
+                        index,
+                        error: 'Missing code property',
+                        filename: file.filename
+                    });
+                    return;
+                }
+                
+                if (typeof file.code !== 'string') {
+                    errors.push({
+                        index,
+                        error: 'Code must be a string',
+                        filename: file.filename,
+                        receivedType: typeof file.code
+                    });
+                    return;
+                }
+                
+                const detection = languageDetector.detectLanguage(file.code, file.filename);
+                
+                results.push({
+                    index,
+                    filename: file.filename || `file_${index}`,
+                    ...detection,
+                    supportedForAnalysis: ['javascript', 'python', 'java'].includes(detection.language),
+                    codeLength: file.code.length,
+                    linesOfCode: file.code.split('\n').length
+                });
+                
+            } catch (fileError) {
+                console.error(`Error processing file ${index}:`, fileError);
+                errors.push({
+                    index,
+                    filename: file.filename,
+                    error: 'Processing failed',
+                    message: fileError.message
+                });
+            }
+        });
+        
+        const responseTime = Date.now() - startTime;
+        
+        res.json({
+            results,
+            errors: errors.length > 0 ? errors : undefined,
+            summary: {
+                totalFiles: files.length,
+                successfullyProcessed: results.length,
+                failedFiles: errors.length,
+                detectedLanguages: [...new Set(results.map(r => r.language))],
+                supportedFiles: results.filter(r => r.supportedForAnalysis).length,
+                processingTime: `${responseTime}ms`
+            },
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Batch language detection error:', error);
+        res.status(500).json({ 
+            error: 'Batch processing failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Get supported languages and extensions
+app.get('/api/supported-languages', (req, res) => {
+    try {
+        const languages = languageDetector.getSupportedLanguages();
+        const extensions = languageDetector.extensionMap;
+        
+        res.json({
+            languages,
+            extensions,
+            analysisSupported: ['javascript', 'python', 'java'],
+            detectionMethod: 'content_analysis + file_extension',
+            counts: {
+                totalLanguages: languages.length,
+                totalExtensions: Object.keys(extensions).length,
+                analysisReady: 3
+            },
+            capabilities: {
+                contentAnalysis: true,
+                fileExtensionDetection: true,
+                batchProcessing: true,
+                mlIntegration: true
+            },
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Supported languages endpoint error:', error);
+        res.status(500).json({ 
+            error: 'Failed to retrieve supported languages',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Code preprocessing and statistics
+app.post('/api/preprocess-code', validateCodeInput, (req, res) => {
+    try {
+        const { code, language: providedLanguage, filename } = req.body;
+        const startTime = Date.now();
+        
+        const detection = languageDetector.detectLanguage(code, filename);
+        const language = providedLanguage || detection.language;
+        
+        // Basic preprocessing with error handling
+        let statistics;
+        try {
+            const lines = code.split('\n');
+            const nonEmptyLines = lines.filter(line => line.trim() !== '');
+            
+            // Language-specific comment detection
+            const commentPatterns = {
+                javascript: [/^\s*\/\//, /^\s*\/\*/, /\*\/\s*$/],
+                python: [/^\s*#/],
+                java: [/^\s*\/\//, /^\s*\/\*/, /\*\/\s*$/],
+                c: [/^\s*\/\//, /^\s*\/\*/, /\*\/\s*$/, /^\s*#/],
+                cpp: [/^\s*\/\//, /^\s*\/\*/, /\*\/\s*$/],
+                sql: [/^\s*--/, /^\s*\/\*/]
+            };
+            
+            const patterns = commentPatterns[language] || [/^\s*\/\//, /^\s*#/];
+            const comments = lines.filter(line => {
+                const trimmed = line.trim();
+                return patterns.some(pattern => pattern.test(trimmed));
+            });
+            
+            statistics = {
+                totalLines: lines.length,
+                codeLines: nonEmptyLines.length,
+                emptyLines: lines.length - nonEmptyLines.length,
+                commentLines: comments.length,
+                characters: code.length,
+                charactersNoSpaces: code.replace(/\s/g, '').length,
+                words: code.split(/\s+/).filter(word => word.length > 0).length,
+                averageLineLength: Math.round(code.length / lines.length),
+                maxLineLength: Math.max(...lines.map(line => line.length))
+            };
+        } catch (statsError) {
+            console.warn('Statistics calculation failed:', statsError);
+            statistics = {
+                totalLines: code.split('\n').length,
+                characters: code.length,
+                error: 'Detailed statistics unavailable'
+            };
+        }
+        
+        const responseTime = Date.now() - startTime;
+        
+        res.json({
+            originalCode: code,
+            language,
+            detection,
+            statistics,
+            readyForAnalysis: ['javascript', 'python', 'java'].includes(language.toLowerCase()),
+            preprocessing: {
+                codeNormalized: code.trim().length > 0,
+                languageDetected: !detection.error,
+                statisticsGenerated: !statistics.error
+            },
+            metadata: {
+                processingTime: `${responseTime}ms`,
+                timestamp: new Date().toISOString()
+            }
+        });
+        
+    } catch (error) {
+        console.error('Code preprocessing error:', error);
+        res.status(500).json({ 
+            error: 'Code preprocessing failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// 404 handler for undefined routes
+app.use('*', (req, res) => {
+    res.status(404).json({
+        error: 'Endpoint not found',
+        message: `The endpoint ${req.method} ${req.originalUrl} does not exist`,
+        availableEndpoints: [
+            'GET /api/health',
+            'POST /api/detect-language',
+            'POST /api/analyze-code',
+            'GET /api/test-ml',
+            'POST /api/detect-languages-batch',
+            'GET /api/supported-languages',
+            'POST /api/preprocess-code'
+        ],
+        documentation: 'https://github.com/your-repo/codeguard-api',
+        timestamp: new Date().toISOString()
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
 });
 
-// WebSocket handling
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
-  socket.on('join', (userId) => {
-    socket.join(`user:${userId}`);
-    console.log(`User ${userId} joined room`);
-  });
-  
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
-});
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime() + 's'
-  });
-});
-
-// Error handling middleware
+// Global error handling middleware
 app.use((error, req, res, next) => {
-  console.error(error.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+    console.error('🚨 Global error handler:', {
+        error: error.message,
+        stack: error.stack,
+        url: req.originalUrl,
+        method: req.method,
+        ip: req.ip,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Don't send error details in production
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    
+    res.status(500).json({ 
+        error: 'Internal server error',
+        message: isDevelopment ? error.message : 'An unexpected error occurred',
+        stack: isDevelopment ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
+    });
 });
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/codeguard', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
-
-// Start server
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+    console.log('📝 Received SIGTERM, shutting down gracefully...');
+    process.exit(0);
 });
+
+process.on('SIGINT', () => {
+    console.log('📝 Received SIGINT, shutting down gracefully...');
+    process.exit(0);
+});
+
+// Start server with comprehensive error handling
+const server = app.listen(PORT, () => {
+    console.log(`🚀 Enhanced CodeGuard Server running on port ${PORT}`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🔍 Language detection: http://localhost:${PORT}/api/detect-language`);
+    console.log(`🧪 Code analysis: http://localhost:${PORT}/api/analyze-code`);
+    console.log(`🤖 ML service URL: ${ML_SERVICE_URL}`);
+    console.log(`📚 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`⚡ Server ready to accept connections`);
+});
+
+// Handle server startup errors
+server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use. Please choose a different port or stop the process using this port.`);
+        console.error(`💡 Try: lsof -ti:${PORT} | xargs kill -9`);
+    } else if (error.code === 'EACCES') {
+        console.error(`❌ Permission denied to bind to port ${PORT}. Try using a port > 1024 or run with sudo.`);
+    } else {
+        console.error(`❌ Server startup error:`, error);
+    }
+    process.exit(1);
+});
+
+module.exports = app;
