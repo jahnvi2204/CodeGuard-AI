@@ -12,13 +12,6 @@ app.use(express.urlencoded({ extended: true }));
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 const PORT = process.env.PORT || 5000;
 
-// ============================================================================
-// PROGRAMMING LANGUAGE DETECTION
-// ============================================================================
-
-
-
-
 
 // Graceful shutdown handling
 process.on('SIGTERM', () => {
