@@ -1,0 +1,50 @@
+{
+  "name": "codeguard-ai",
+  "version": "1.0.0",
+  "description": "CodeGuard AI - Full Stack Application",
+  "private": true,
+  "workspaces": [
+    "codeGuardAI/frontend",
+    "codeGuardAI/backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd codeGuardAI/frontend && npm run dev",
+    "dev:backend": "cd codeGuardAI/backend && npm run dev",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd codeGuardAI/frontend && npm run build",
+    "build:backend": "cd codeGuardAI/backend && npm run build",
+    "start": "npm run start:backend",
+    "start:frontend": "cd codeGuardAI/frontend && npm run preview",
+    "start:backend": "cd codeGuardAI/backend && npm start",
+    "install:all": "npm install && cd codeGuardAI/frontend && npm install && cd ../backend && npm install",
+    "test": "npm run test:backend",
+    "test:frontend": "cd codeGuardAI/frontend && npm run test",
+    "test:backend": "cd codeGuardAI/backend && npm run test",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "cd codeGuardAI/frontend && npm run lint",
+    "lint:backend": "cd codeGuardAI/backend && npm run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "codeguard",
+    "ai",
+    "code-analysis",
+    "security",
+    "vulnerability-detection",
+    "static-analysis",
+    "monorepo"
+  ],
+  "author": "Jahnvi Saxena",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jahnvi2204/CodeGuard-AI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jahnvi2204/CodeGuard-AI/issues"
+  },
+  "homepage": "https://github.com/jahnvi2204/CodeGuard-AI#readme"
+}
