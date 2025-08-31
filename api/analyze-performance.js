@@ -1,9 +1,8 @@
-const MLService = require('../codeGuardAI/backend/src/services/mlService');
-const LanguageDetectionService = require('../codeGuardAI/backend/src/services/languageDetection');
-const { createSuccessResponse, createErrorResponse } = require('../codeGuardAI/backend/src/utils/helpers');
+const MLService = require('../backend/src/services/mlService');
+const LanguageDetectionService = require('../backend/src/services/languageDetection');
+const { createSuccessResponse, createErrorResponse } = require('../backend/src/utils/helpers');
 
 module.exports = async function handler(req, res) {
-    // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

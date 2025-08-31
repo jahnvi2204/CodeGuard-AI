@@ -15,9 +15,8 @@ codeguard-ai/
 │   ├── analyze-performance.js        # Performance analysis
 │   ├── test-ml-connection.js         # ML connection test
 │   └── package.json                  # API dependencies
-├── codeGuardAI/
-│   ├── frontend/                     # React frontend
-│   └── backend/                      # Original backend (kept for modules)
+├── frontend/                         # React frontend
+├── backend/                          # Original backend (kept for modules)
 ├── vercel.json                       # Vercel configuration
 ├── package.json                      # Root package.json with deployment scripts
 └── env.production                    # Environment variables example

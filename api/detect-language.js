@@ -1,5 +1,5 @@
-const LanguageDetectionService = require('../codeGuardAI/backend/src/services/languageDetection');
-const { getCodeMetrics, createSuccessResponse, createErrorResponse } = require('../codeGuardAI/backend/src/utils/helpers');
+const LanguageDetectionService = require('../backend/src/services/languageDetection');
+const { getCodeMetrics, createSuccessResponse, createErrorResponse } = require('../backend/src/utils/helpers');
 
 module.exports = async function handler(req, res) {
     // Set CORS headers

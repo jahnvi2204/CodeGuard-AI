@@ -3,7 +3,7 @@
   "name": "codeguard-ai",
   "builds": [
     {
-      "src": "codeGuardAI/frontend/package.json",
+      "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist"
@@ -61,8 +61,8 @@
     "ML_SERVICE_URL": "https://ml-service-a9l2.onrender.com",
     "NODE_ENV": "production"
   },
-  "buildCommand": "cd codeGuardAI/frontend && npm run build",
-  "outputDirectory": "codeGuardAI/frontend/dist",
-  "installCommand": "cd codeGuardAI/frontend && npm install && cd ../backend && npm install"
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/dist",
+  "installCommand": "cd frontend && npm install"
 }
 

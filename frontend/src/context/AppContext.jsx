@@ -4,8 +4,8 @@ const AppContext = createContext();
 
 // Try to load the most recent saved project from localStorage
 let initialState = {
-  code: `// Sample JavaScript code for analysis\nfunction authenticateUser(username, password) {\n  // Potential SQL injection vulnerability\n  const query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";\n  \n  // Potential XSS vulnerability  \n  document.getElementById('welcome').innerHTML = "Welcome " + username;\n  \n  // Performance issue - inefficient loop\n  let result = [];\n  for(let i = 0; i < 10000; i++) {\n    for(let j = 0; j < 1000; j++) {\n      result.push(i * j);\n    }\n  }\n  \n  return executeQuery(query);\n}\n\n// Hardcoded secret\nconst API_KEY = "sk-12345abcdef";\n\nfunction processData(data) {\n  // Missing error handling\n  const parsed = JSON.parse(data);\n  return parsed.results;\n}`,
-  language: 'javascript',
+  code: '',
+  language: 'auto',
   analysisResults: null,
   isAnalyzing: false,
   error: null,

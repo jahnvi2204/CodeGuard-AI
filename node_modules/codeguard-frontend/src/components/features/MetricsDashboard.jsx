@@ -50,7 +50,7 @@ const MetricsDashboard = () => {
           <div className="text-sm text-green-300">Analysis Time</div>
         </div>
         <div className="bg-purple-900/30 border border-purple-700/50 p-4 rounded-xl">
-          <div className="text-3xl font-bold text-purple-400">{analysisResults.lines_analyzed || state.code.split('\n').length}</div>
+          <div className="text-3xl font-bold text-purple-400">{analysisResults.lines_analyzed || (state.code.trim() ? state.code.split('\n').length : 0)}</div>
           <div className="text-sm text-purple-300">Lines Analyzed</div>
         </div>
         <div className="bg-orange-900/30 border border-orange-700/50 p-4 rounded-xl">

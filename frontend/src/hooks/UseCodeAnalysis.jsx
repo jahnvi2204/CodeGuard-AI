@@ -1,4 +1,4 @@
-import { codeAnalysisService } from '../services/codeAnalysisService';
+import { codeAnalysisService } from '../services/CodeAnalysisService';
 import { useAppContext } from '../context/AppContext';
 
 export const useCodeAnalysis = () => {

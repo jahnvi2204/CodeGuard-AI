@@ -1,4 +1,9 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+export const API_BASE_URL = '/api'; // Force relative URL for development
+console.log('Environment variables:', {
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  NODE_ENV: import.meta.env.NODE_ENV,
+  MODE: import.meta.env.MODE
+});
 
 export const APP_CONFIG = {
   name: import.meta.env.VITE_APP_NAME || 'CodeGuard AI',

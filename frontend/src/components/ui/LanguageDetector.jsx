@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
-import { codeAnalysisService } from '../../services/codeAnalysisService';
+import { codeAnalysisService } from '../../services/CodeAnalysisService';
 
 const LanguageDetector = () => {
   const { state, actions } = useAppContext();

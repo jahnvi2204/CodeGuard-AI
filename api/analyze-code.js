@@ -1,7 +1,7 @@
-const MLService = require('../codeGuardAI/backend/src/services/mlService');
-const LanguageDetectionService = require('../codeGuardAI/backend/src/services/languageDetection');
-const { getCodeMetrics, createSuccessResponse, createErrorResponse } = require('../codeGuardAI/backend/src/utils/helpers');
-const config = require('../codeGuardAI/backend/src/config');
+const MLService = require('../backend/src/services/mlService');
+const LanguageDetectionService = require('../backend/src/services/languageDetection');
+const { getCodeMetrics, createSuccessResponse, createErrorResponse } = require('../backend/src/utils/helpers');
+const config = require('../backend/src/config');
 
 module.exports = async function handler(req, res) {
     // Set CORS headers

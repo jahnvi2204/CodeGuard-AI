@@ -1,6 +1,6 @@
-const MLService = require('../codeGuardAI/backend/src/services/mlService');
-const { API_ENDPOINTS } = require('../codeGuardAI/backend/src/utils/constants');
-const config = require('../codeGuardAI/backend/src/config');
+const MLService = require('../backend/src/services/mlService');
+const { API_ENDPOINTS } = require('../backend/src/utils/constants');
+const config = require('../backend/src/config');
 
 module.exports = async function handler(req, res) {
     // Set CORS headers
