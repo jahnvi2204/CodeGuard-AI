@@ -4,17 +4,9 @@
   "description": "CodeGuard AI API Functions for Vercel",
   "main": "index.js",
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "axios": "^1.6.0",
-    "express-rate-limit": "^7.1.0",
-    "helmet": "^7.1.0",
-    "compression": "^1.7.4",
-    "morgan": "^1.10.0",
-    "winston": "^3.11.0",
-    "dotenv": "^16.3.1"
+    "axios": "^1.6.0"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
   }
 }

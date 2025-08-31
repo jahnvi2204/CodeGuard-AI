@@ -1,6 +1,6 @@
-const MLService = require('../backend/src/services/mlService');
-const { API_ENDPOINTS } = require('../backend/src/utils/constants');
-const config = require('../backend/src/config');
+const MLService = require('./mlService');
+const { API_ENDPOINTS } = require('./constants');
+const config = require('./config');
 
 module.exports = async function handler(req, res) {
     // Set CORS headers
@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        const mlHealth = await MLService.checkHealth();
+        const mlHealth = await MLService.checkStatus();
         
         res.json({
             status: 'healthy',

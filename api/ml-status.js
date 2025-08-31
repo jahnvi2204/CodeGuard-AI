@@ -1,5 +1,7 @@
-const MLService = require('../backend/src/services/mlService');
-const config = require('../backend/src/config');
+const MLService = require('./mlService');
+const { formatResponse, formatError } = require('./helpers');
+const { HTTP_STATUS } = require('./constants');
+const config = require('./config');
 
 module.exports = async function handler(req, res) {
     // Set CORS headers
@@ -18,24 +20,18 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        const healthCheck = await MLService.checkHealth();
-        const serviceInfo = healthCheck.available ? await MLService.getSystemStatus() : null;
-        const debugInfo = healthCheck.available ? await MLService.getDebugEnvironment() : null;
+        const healthCheck = await MLService.checkStatus();
 
-        res.json({
+        const responseData = {
             ml_service_url: config.mlServiceUrl,
             health_check: healthCheck,
-            service_info: serviceInfo,
-            debug_info: debugInfo,
             last_checked: new Date().toISOString()
-        });
+        };
+
+        res.json(formatResponse(responseData, true, 'ML service status retrieved successfully'));
         
     } catch (error) {
         console.error('ML status check error:', error);
-        res.status(500).json({
-            error: 'Status check failed',
-            details: error.message,
-            timestamp: new Date().toISOString()
-        });
+        res.status(500).json(formatError(error, 500));
     }
 };

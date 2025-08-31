@@ -1,4 +1,6 @@
-const MLService = require('../backend/src/services/mlService');
+const MLService = require('./mlService');
+const { formatResponse, formatError } = require('./helpers');
+const { HTTP_STATUS } = require('./constants');
 
 module.exports = async function handler(req, res) {
     // Set CORS headers

@@ -1,7 +1,7 @@
-const MLService = require('../backend/src/services/mlService');
-const LanguageDetectionService = require('../backend/src/services/languageDetection');
-const { getCodeMetrics, createSuccessResponse, createErrorResponse } = require('../backend/src/utils/helpers');
-const config = require('../backend/src/config');
+const MLService = require('./mlService');
+const { validateCode, validateLanguage, formatResponse, formatError, detectLanguageFromCode, getCodeMetrics } = require('./helpers');
+const { HTTP_STATUS } = require('./constants');
+const config = require('./config');
 
 module.exports = async function handler(req, res) {
     // Set CORS headers
@@ -23,13 +23,13 @@ module.exports = async function handler(req, res) {
         const { code, language } = req.body;
         
         if (!code || typeof code !== 'string') {
-            return res.status(400).json(createErrorResponse(
+            return res.status(400).json(formatError(
                 'Invalid input',
                 'Code is required and must be a string'
             ));
         }
         
-        const finalLanguage = language || LanguageDetectionService.detectLanguage(code);
+        const finalLanguage = language || detectLanguageFromCode(code);
         
         const mlResult = await MLService.callService('/analyze/complete', {
             code: code,
@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
         });
 
         if (!mlResult.success) {
-            return res.status(503).json(createErrorResponse(
+            return res.status(503).json(formatError(
                 'ML service unavailable',
                 {
                     message: 'Could not connect to analysis service',
@@ -54,12 +54,12 @@ module.exports = async function handler(req, res) {
             mlServiceUrl: config.mlServiceUrl
         };
 
-        const enhancedResponse = createSuccessResponse(mlResult.data, metadata);
+        const enhancedResponse = formatResponse(mlResult.data, metadata);
         res.json(enhancedResponse);
         
     } catch (error) {
         console.error('Code analysis error:', error);
-        res.status(500).json(createErrorResponse(
+        res.status(500).json(formatError(
             'Analysis failed',
             error.message
         ));

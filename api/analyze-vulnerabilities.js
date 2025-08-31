@@ -1,6 +1,6 @@
-const MLService = require('../backend/src/services/mlService');
-const LanguageDetectionService = require('../backend/src/services/languageDetection');
-const { createSuccessResponse, createErrorResponse } = require('../backend/src/utils/helpers');
+const MLService = require('./mlService');
+const { validateCode, validateLanguage, formatResponse, formatError, detectLanguageFromCode } = require('./helpers');
+const { HTTP_STATUS } = require('./constants');
 
 module.exports = async function handler(req, res) {
     // Set CORS headers
@@ -22,13 +22,13 @@ module.exports = async function handler(req, res) {
         const { code, language } = req.body;
         
         if (!code || typeof code !== 'string') {
-            return res.status(400).json(createErrorResponse(
+            return res.status(400).json(formatError(
                 'Invalid input',
                 'Code is required and must be a string'
             ));
         }
         
-        const finalLanguage = language || LanguageDetectionService.detectLanguage(code);
+        const finalLanguage = language || detectLanguageFromCode(code);
         
         const mlResult = await MLService.callService('/analyze/vulnerabilities', {
             code: code,
@@ -36,17 +36,17 @@ module.exports = async function handler(req, res) {
         });
 
         if (!mlResult.success) {
-            return res.status(503).json(createErrorResponse(
+            return res.status(503).json(formatError(
                 'ML service unavailable',
                 mlResult.error
             ));
         }
 
-        res.json(createSuccessResponse(mlResult.data));
+        res.json(formatResponse(mlResult.data));
         
     } catch (error) {
         console.error('Vulnerability analysis error:', error);
-        res.status(500).json(createErrorResponse(
+        res.status(500).json(formatError(
             'Vulnerability analysis failed',
             error.message
         ));

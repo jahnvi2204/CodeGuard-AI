@@ -1,0 +1,16 @@
+{
+  "name": "CodeGuard AI",
+  "short_name": "CodeGuard",
+  "description": "AI-powered code analysis and security scanning tool",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#1a1a1a",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

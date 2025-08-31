@@ -1,5 +1,5 @@
-const LanguageDetectionService = require('../backend/src/services/languageDetection');
-const { getCodeMetrics, createSuccessResponse, createErrorResponse } = require('../backend/src/utils/helpers');
+const { detectLanguageFromCode, validateCode, formatResponse, formatError, getCodeMetrics } = require('./helpers');
+const { HTTP_STATUS } = require('./constants');
 
 module.exports = async function handler(req, res) {
     // Set CORS headers
@@ -21,14 +21,14 @@ module.exports = async function handler(req, res) {
         const { code } = req.body;
         
         if (!code || typeof code !== 'string') {
-            return res.status(400).json(createErrorResponse(
+            return res.status(400).json(formatError(
                 'Invalid input',
                 'Code is required and must be a string'
             ));
         }
         
-        const detectedLanguage = LanguageDetectionService.detectLanguage(code);
-        const confidence = LanguageDetectionService.getConfidence(detectedLanguage);
+        const detectedLanguage = detectLanguageFromCode(code);
+        const confidence = 0.8; // Default confidence for simple detection
         const codeMetrics = getCodeMetrics(code);
 
         const responseData = {
@@ -37,10 +37,10 @@ module.exports = async function handler(req, res) {
             ...codeMetrics
         };
 
-        res.json(createSuccessResponse(responseData));
+        res.json(formatResponse(responseData));
     } catch (error) {
         console.error('Language detection error:', error);
-        res.status(500).json(createErrorResponse(
+        res.status(500).json(formatError(
             'Language detection failed',
             error.message
         ));
