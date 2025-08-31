@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { Terminal, Shield, TrendingUp } from 'lucide-react';
 import { useAppContext } from './context/AppContext';
-import { useCodeAnalysis } from './hooks/useCodeAnalysis';
+import { useCodeAnalysis } from './hooks/UseCodeAnalysis';
 import Header from './components/common/Header';
 import Loading from './components/common/Loading';
 import CodeEditor from './components/ui/CodeEditor';

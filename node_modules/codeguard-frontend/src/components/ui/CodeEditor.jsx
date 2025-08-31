@@ -1,7 +1,7 @@
 import React from 'react';
 import { Code2, Play, FileText } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
-import { useCodeAnalysis } from '../../hooks/useCodeAnalysis';
+import { useCodeAnalysis } from '../../hooks/UseCodeAnalysis';
 import { SAMPLE_CODES } from '../../utils/Constants';
 import LanguageDetector from './LanguageDetector';
 

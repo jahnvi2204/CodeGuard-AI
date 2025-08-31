@@ -256,3 +256,4 @@ sonar-project.properties
 
 # Performance monitoring
 .clinic
+.vercel
