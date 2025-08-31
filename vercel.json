@@ -57,7 +57,7 @@
     }
   ],
   "env": {
-    "VITE_API_BASE_URL": "https://codeguard-ai.vercel.app",
+    "VITE_API_BASE_URL": "/api",
     "ML_SERVICE_URL": "https://ml-service-a9l2.onrender.com",
     "NODE_ENV": "production"
   },
