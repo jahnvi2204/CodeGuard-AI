@@ -7,8 +7,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:analyze": "vite build --mode analyze",
     "preview": "vite preview",
-    "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint src --ext js,jsx --fix",
+    "test": "echo 'No tests specified yet'",
+    "type-check": "echo 'No TypeScript configuration'",
+    "serve": "vite preview --port 4173"
   },
   "dependencies": {
     "axios": "^1.10.0",

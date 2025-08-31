@@ -1,4 +1,11 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+export const APP_CONFIG = {
+  name: import.meta.env.VITE_APP_NAME || 'CodeGuard AI',
+  version: import.meta.env.VITE_APP_VERSION || '1.0.0',
+  environment: import.meta.env.NODE_ENV || 'development',
+  buildTime: __BUILD_TIME__ || new Date().toISOString()
+};
 
 export const SUPPORTED_LANGUAGES = [
   { value: 'auto', label: 'Auto Detect' },
@@ -8,6 +15,7 @@ export const SUPPORTED_LANGUAGES = [
   { value: 'cpp', label: 'C++' },
   { value: 'c', label: 'C' }
 ];
+
 
 export const SAMPLE_CODES = {
   javascript: `// Sample JavaScript code for analysis

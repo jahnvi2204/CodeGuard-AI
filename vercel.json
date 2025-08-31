@@ -1,0 +1,68 @@
+{
+  "version": 2,
+  "name": "codeguard-ai",
+  "builds": [
+    {
+      "src": "codeGuardAI/frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "api/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/assets/(.*)",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "VITE_API_BASE_URL": "https://codeguard-ai.vercel.app",
+    "ML_SERVICE_URL": "https://ml-service-a9l2.onrender.com",
+    "NODE_ENV": "production"
+  },
+  "buildCommand": "cd codeGuardAI/frontend && npm run build",
+  "outputDirectory": "codeGuardAI/frontend/dist",
+  "installCommand": "cd codeGuardAI/frontend && npm install && cd ../backend && npm install"
+}
+
