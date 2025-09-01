@@ -1,5 +1,7 @@
 # CodeGuard AI 🛡️
+
 Live Demo Link : https://codeguard-ai.vercel.app/
+
 ML Model Link: https://ml-service-a9l2.onrender.com/
 A comprehensive AI-powered code analysis platform that detects vulnerabilities, analyzes performance, and provides intelligent insights for secure and efficient software development.
 
@@ -18,7 +20,6 @@ A comprehensive AI-powered code analysis platform that detects vulnerabilities, 
 - **RESTful API** with comprehensive endpoint coverage
 - **Rate limiting** and security middleware
 - **ML Service Integration** for AI-powered analysis
-- **Structured logging** with Winston
 - **Production-ready** configurations
 
 ### Frontend (React + Vite)
@@ -27,11 +28,6 @@ A comprehensive AI-powered code analysis platform that detects vulnerabilities, 
 - **Real-time updates** and interactive components
 - **Optimized build** with code splitting
 
-### Infrastructure
-- **Docker containerization** for easy deployment
-- **Docker Compose** for multi-service orchestration
-- **Production configurations** with security best practices
-- **Health checks** and monitoring
 
 ## 🚀 Quick Start
 
@@ -42,17 +38,6 @@ A comprehensive AI-powered code analysis platform that detects vulnerabilities, 
 ### Option 1: Docker Deployment (Recommended)
 
 ```bash
-# Clone the repository
-git clone https://github.com/jahnvi2204/CodeGuard-AI.git
-cd CodeGuard-AI
-
-# Start development environment
-docker-compose up -d
-
-# Or start production environment
-docker-compose -f docker-compose.prod.yml up -d
-```
-
 **Access the application:**
 - Frontend: http://localhost (port 80)
 - Backend API: http://localhost:5002
@@ -74,56 +59,24 @@ npm install
 npm run dev
 ```
 
-### Option 3: Using Deployment Scripts
-
-#### Linux/macOS
-```bash
-# Make script executable
-chmod +x deploy.sh
-
-# Deploy development environment
-./deploy.sh dev
-
-# Deploy production environment
-./deploy.sh prod --build
-
-# Show logs
-./deploy.sh prod --logs
-
-# Stop services
-./deploy.sh prod --stop
-```
-
-#### Windows
-```cmd
-# Deploy development environment
-deploy.bat dev
-
-# Deploy production environment
-deploy.bat prod --build
-
-# Show status
-deploy.bat prod --status
-```
 
 ## 📖 API Documentation
 
 ### Core Endpoints
 
 #### Health Check
-```
+
 GET /api/health
-```
+
 
 #### Language Detection
-```
+
 POST /api/detect-language
 Content-Type: application/json
 
 {
   "code": "console.log('Hello World');"
 }
-```
 
 #### Code Analysis
 ```
