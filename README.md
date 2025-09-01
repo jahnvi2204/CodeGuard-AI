@@ -1,5 +1,6 @@
 # CodeGuard AI 🛡️
-
+Live Demo Link : https://codeguard-ai.vercel.app/
+ML Model Link: https://ml-service-a9l2.onrender.com/
 A comprehensive AI-powered code analysis platform that detects vulnerabilities, analyzes performance, and provides intelligent insights for secure and efficient software development.
 
 ## 🚀 Features
